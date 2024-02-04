@@ -3,8 +3,9 @@ import "bootstrap/dist/css/bootstrap.min.css";
 import "./App.css";
 import { Button, Col, Container, Form, InputGroup, Row } from "react-bootstrap";
 import Cracha from "./components/Cracha";
-import useLocalStorage from "./hooks/useLocalStorage";
 import avatar from "./assets/avatar.png";
+import { db } from "./services/db";
+import { useLiveQuery } from "dexie-react-hooks";
 
 function App() {
   const inputRef = useRef(null);
@@ -18,17 +19,17 @@ function App() {
 
   const [cracha, setCracha] = useState(initialCracha);
 
-  const [crachas, setCrachas] = useLocalStorage("crachas", []);
+  const crachas = useLiveQuery(() => db.crachas.toArray());
 
   const renderCrachas = () => {
-    return crachas.map((cracha) => (
+    return crachas?.map((cracha) => (
       <Cracha
         key={cracha}
         {...cracha}
         remove={true}
         onRemove={() => {
           confirm("Deseja realmente remover o crachá?") &&
-            setCrachas(crachas.filter((c) => c.id_cracha !== cracha.id_cracha));
+            db.crachas.delete(cracha.id);
         }}
       />
     ));
@@ -57,19 +58,16 @@ function App() {
     const fileReader = new FileReader();
     fileReader.readAsText(e.target.files[0], "UTF-8");
     fileReader.onload = (e) => {
-      setCrachas(JSON.parse(e.target.result));
+      JSON.parse(e.target.result).forEach((cracha) => {
+        db.crachas.add(cracha);
+      });
       importRef.current.value = "";
     };
   };
 
-  const adicionar = () => {
-    setCrachas((prev) => [
-      ...prev,
-      {
-        id_cracha: prev.length + 1,
-        ...cracha,
-      },
-    ]);
+  const adicionar = async () => {
+    await db.crachas.add(cracha);
+
     setCracha(initialCracha);
     inputRef.current.value = "";
   };
@@ -144,7 +142,7 @@ function App() {
                 onChange={(e) => {
                   setCracha({ ...cracha, nome: e.target.value });
                 }}
-                maxlength="16"
+                maxLength="16"
                 value={cracha.nome}
                 aria-describedby="basic-addon3"
               />
@@ -159,7 +157,7 @@ function App() {
                 onChange={(e) => {
                   setCracha({ ...cracha, cargo: e.target.value });
                 }}
-                maxlength="16"
+                maxLength="16"
                 value={cracha.cargo}
                 aria-describedby="basic-addon3"
               />
@@ -185,7 +183,7 @@ function App() {
           <Button
             variant="primary"
             onClick={() => print()}
-            disabled={!crachas.length}
+            disabled={!crachas?.length}
           >
             Imprimir
           </Button>
